@@ -12,6 +12,24 @@ const MOVIE_TYPES = {
   KIDS: 'thiếu_nhi',        // Phim cho trẻ em
 };
 
+// ============ Thể Loại Phim (Categories) ============
+const MOVIE_CATEGORIES = {
+  ACTION: 'hành_động',
+  COMEDY: 'hài_hước',
+  HORROR: 'kinh_dị',
+  ROMANCE: 'tình_cảm',
+  ANIME: 'hoạt_hình',
+  DOCUMENTARY: 'tài_liệu',
+};
+
+// ============ Trạng Thái Phim ============
+const MOVIE_STATUS = {
+  COMING_SOON: 'sắp_chiếu',      // Phim sắp phát hành
+  ONGOING: 'đang_chiếu',         // Phim đang phát hành
+  COMPLETED: 'hoàn_thành',       // Phim đã hoàn thành
+  HIDDEN: 'tạm_ẩn',              // Admin tạm ẩn, chưa público
+};
+
 // ============ Vai Trò Người Dùng ============
 const USER_ROLES = {
   USER: 'user',             // Người dùng thường
@@ -67,6 +85,8 @@ const PATTERNS = {
 
 module.exports = {
   MOVIE_TYPES,
+  MOVIE_CATEGORIES,
+  MOVIE_STATUS,
   USER_ROLES,
   VIP_PLANS,
   HTTP_STATUS,
