@@ -1,0 +1,73 @@
+# ==================== Dependencies ====================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# ==================== Environment Variables ====================
+# Không commit file .env vì chứa password, API key
+.env
+.env.local
+.env.*.local
+.env.production
+.env.test
+
+# ==================== IDE & Editor ====================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ==================== OS Files ====================
+Thumbs.db
+desktop.ini
+.DS_Store
+.env.*.local
+
+# ==================== Database ====================
+*.mongodb
+*.db
+*.sqlite
+
+# ==================== Testing ====================
+coverage/
+.nyc_output/
+*.coverage
+.jest/
+
+# ==================== Logs & Debug ====================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+debug.log
+
+# ==================== Build & Dist ====================
+dist/
+build/
+out/
+
+# ==================== Cache & Temp ====================
+.cache/
+.parcel-cache/
+temp/
+tmp/
+*.tmp
+
+# ==================== Cloudinary & Upload ====================
+uploads/
+temp-uploads/
+
+# ==================== Misc ====================
+.env.local.php
+.editorconfig
+.env.*.php
+.phpunit.result.cache
