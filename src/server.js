@@ -4,10 +4,14 @@
 // Chạy: npm run dev (development) hoặc npm start (production)
 //
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-require('dotenv').config();
+const passport = require('passport');
+const session = require('express-session');
 
 // Import config & database
 const config = require('./config/environment');
@@ -28,11 +32,30 @@ app.use(cors({
   credentials: true,
 }));
 
+// Session middleware (cho Passport.js)
+app.use(session({
+  secret: config.JWT_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: config.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  },
+}));
+
 // Parse JSON body
 app.use(express.json());
 
 // Parse URL-encoded body
 app.use(express.urlencoded({ extended: true }));
+
+// ==================== PASSPORT MIDDLEWARE ====================
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Require & setup Passport strategies
+require('./config/passport')(passport);
 
 // ==================== LOG REQUEST ====================
 app.use((req, res, next) => {

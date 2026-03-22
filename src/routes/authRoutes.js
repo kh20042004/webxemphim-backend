@@ -5,6 +5,7 @@
 //
 
 const express = require('express');
+const passport = require('passport');
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -29,6 +30,22 @@ router.post('/register', authController.register);
  */
 router.post('/login', authController.login);
 
+/**
+ * POST /api/auth/forgot-password
+ * Mô tả: Gửi mã reset password tới email
+ * Body: { email }
+ * Response: { success, message }
+ */
+router.post('/forgot-password', authController.forgotPassword);
+
+/**
+ * POST /api/auth/reset-password
+ * Mô tả: Đặt lại mật khẩu bằng mã reset password
+ * Body: { email, code, newPassword, confirmPassword }
+ * Response: { success, message }
+ */
+router.post('/reset-password', authController.resetPassword);
+
 // ==================== PROTECTED ROUTES (CẦN ĐĂNG NHẬP) ====================
 
 /**
@@ -48,6 +65,50 @@ router.get('/me', protect, authController.getMe);
  * Middleware: protect (kiểm tra JWT token)
  */
 router.post('/logout', protect, authController.logout);
+
+// ==================== GOOGLE OAUTH ROUTES ====================
+
+/**
+ * GET /api/auth/google
+ * Mô tả: Redirect tới Google để xác thực
+ * Middleware: passport.authenticate('google')
+ */
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+/**
+ * GET /api/auth/google/callback
+ * Mô tả: Google callback sau khi user xác thực
+ * Lưu ý: Frontend sẽ bị redirect tới URL này
+ * Response: Redirect hoặc trả về JWT token
+ */
+
+// Middleware to log callback info
+const logCallbackInfo = (req, res, next) => {
+  console.log('\n🔐 CALLBACK MIDDLEWARE - Before Passport');
+  console.log('req.user before passport:', req.user);
+  console.log('req.session:', req.session ? 'exists' : 'undefined');
+  next();
+};
+
+const afterPassport = (req, res, next) => {
+  console.log('🔐 CALLBACK MIDDLEWARE - After Passport');
+  console.log('req.user after passport:', req.user);
+  console.log('req.session:', req.session);
+  next();
+};
+
+router.get(
+  '/google/callback',
+  logCallbackInfo,
+  passport.authenticate('google', { 
+    failureRedirect: 'http://localhost:3000?error=google_auth_failed'
+  }),
+  afterPassport,
+  authController.googleCallback
+);
 
 // ==================== EXPORT ROUTER ====================
 module.exports = router;

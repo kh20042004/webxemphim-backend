@@ -27,7 +27,7 @@ const userSchema = new mongoose.Schema(
 
     password: {
       type: String,
-      required: [true, 'Mật khẩu là bắt buộc'],
+      required: false, // Không bắt buộc cho Google OAuth users
       minlength: [6, 'Mật khẩu phải ít nhất 6 ký tự'],
       select: false, // Không trả về password khi query mà không chỉ định rõ
     },
@@ -60,6 +60,32 @@ const userSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       default: null,
+    },
+
+    // ============ Google OAuth ============
+    googleId: {
+      type: String,
+      default: null,
+      unique: true,
+      sparse: true, // Cho phép null values mà không bị duplicate
+    },
+
+    isEmailVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ============ Password Reset ============
+    resetPasswordToken: {
+      type: String,
+      default: null,
+      select: false,
+    },
+
+    resetPasswordExpire: {
+      type: Date,
+      default: null,
+      select: false,
     },
   },
   {
@@ -141,6 +167,25 @@ userSchema.index({ email: 1 });
  */
 userSchema.statics.findByEmail = function (email) {
   return this.findOne({ email: email.toLowerCase() });
+};
+
+/**
+ * Phương thức: Tạo token reset password
+ * Dùng cho: Forgot Password flow
+ * @returns {string} - Reset password token (6 digits)
+ */
+userSchema.methods.createPasswordResetToken = function () {
+  const crypto = require('crypto');
+  // Sinh token ngẫu nhiên 6 chữ số
+  const resetToken = Math.floor(100000 + Math.random() * 900000).toString();
+  
+  // Hash token để lưu vào DB
+  this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  
+  // Token hết hạn sau 15 phút
+  this.resetPasswordExpire = new Date(Date.now() + 15 * 60 * 1000);
+  
+  return resetToken;
 };
 
 // ==================== TẠO VÀ EXPORT MODEL ====================

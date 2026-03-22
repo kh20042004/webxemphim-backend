@@ -2,9 +2,8 @@
 // 
 // File này load tất cả biến từ .env và export ra để dùng trong toàn app
 // Sử dụng: const config = require('../config/environment');
+// Note: dotenv được load trong server.js trước khi import file này
 //
-
-require('dotenv').config();
 
 const config = {
   // ============ Cấu hình Server ============
@@ -29,6 +28,17 @@ const config = {
   // ============ Cấu hình Admin (Tài khoản admin mặc định) ============
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@webxemphim.com',     // Email admin default
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123456',        // Password admin default
+
+  // ============ Cấu hình Email (Gửi email) ============
+  SMTP_HOST: process.env.SMTP_HOST || 'smtp.gmail.com',
+  SMTP_PORT: process.env.SMTP_PORT || 587,
+  SMTP_FROM_EMAIL: process.env.SMTP_FROM_EMAIL || 'tk04052k4@gmail.com', // Email gửi đi
+  SMTP_FROM_PASSWORD: process.env.SMTP_FROM_PASSWORD || '',           // App Password từ Google
+
+  // ============ Cấu hình Google OAuth ============
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
+  GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback',
 };
 
 module.exports = config;
