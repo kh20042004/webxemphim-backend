@@ -49,10 +49,17 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ==================== IMPORT ROUTES (Khi tạo xong route files) ====================
-// Mỗi người sẽ thêm routes của mình vào đây
-// VD:
-// app.use('/api/auth', require('./routes/authRoutes'));
+// ==================== IMPORT ROUTES ====================
+// Import các route files
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+
+// ==================== MOUNT ROUTES ====================
+// Xác thực & User
+app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
+
+// Các routes khác (mỗi người thêm vào đây)
 // app.use('/api/movies', require('./routes/movieRoutes'));
 // app.use('/api/comments', require('./routes/commentRoutes'));
 // ...

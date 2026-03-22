@@ -1,97 +1,135 @@
-// ==================== AUTHENTICATION MIDDLEWARE ====================
+// ==================== AUTH MIDDLEWARE ====================
 //
-// Middleware để kiểm tra JWT token
-// Sử dụng: app.use(authMiddleware) hoặc router.get('/protected', authMiddleware, controller)
+// Mô tả: Middleware kiểm tra JWT token và xác thực user
+// Dùng cho: Bảo vệ các route cần đăng nhập
+// Sử dụng:
+//   const { protect, authorize, requireAdmin } = require('../middleware/auth');
+//   router.get('/profile', protect, profileController);
+//   router.delete('/admin/users', protect, authorize('admin'), deleteUser);
 //
 
 const jwt = require('jsonwebtoken');
 const config = require('../config/environment');
-const { HTTP_STATUS, MESSAGES } = require('../config/constants');
+const User = require('../models/User');
+const { HTTP_STATUS, MESSAGES, USER_ROLES } = require('../config/constants');
+
+// ==================== MIDDLEWARE: KIỂM TRA ĐĂNG NHẬP ====================
 
 /**
- * Middleware kiểm tra JWT token
+ * Middleware: Kiểm tra user có token hợp lệ không
+ * Nếu hợp lệ: Lấy user từ DB, gán vào req.user
+ * Nếu không: Trả về lỗi 401 Unauthorized
  * 
- * Lấy token từ header: Authorization: Bearer <token>
- * Verify token và lưu user info vào req.user
- * 
- * Sử dụng trong route:
- * router.get('/profile', authMiddleware, userController.getProfile);
+ * Cách dùng token:
+ * - Header: Authorization: Bearer <token>
  */
-const authMiddleware = (req, res, next) => {
+exports.protect = async (req, res, next) => {
+  let token;
+
+  // ============ Lấy token từ header ============
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    // Format: "Bearer token_value"
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  // ============ Kiểm tra token có tồn tại không ============
+  if (!token) {
+    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+      success: false,
+      message: MESSAGES.UNAUTHORIZED, // 'Bạn chưa đăng nhập'
+    });
+  }
+
   try {
-    // Lấy token từ header
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // ============ Giải mã token (verify) ============
+    // Nếu token không hợp lệ hoặc hết hạn, jwt.verify sẽ throw error
+    const decoded = jwt.verify(token, config.JWT_SECRET);
+
+    // ============ Lấy user từ database ============
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
       return res.status(HTTP_STATUS.UNAUTHORIZED).json({
         success: false,
-        message: MESSAGES.UNAUTHORIZED,
-        code: 'NO_TOKEN',
+        message: 'User không tồn tại',
       });
     }
 
-    // Tách token: "Bearer <token>" -> "<token>"
-    const token = authHeader.substring(7);
+    // ============ Kiểm tra user có active không ============
+    if (!user.isActive) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: 'Tài khoản đã bị vô hiệu hóa',
+      });
+    }
 
-    // Verify token
-    const decoded = jwt.verify(token, config.JWT_SECRET);
-
-    // Lưu user info vào req
-    req.user = decoded;
+    // ============ Gán user vào req.user để dùng ở controller ============
+    req.user = user;
     next();
   } catch (error) {
-    // Token không hợp lệ hoặc hết hạn
+    // ============ Xử lý lỗi token ============
+    let message = MESSAGES.UNAUTHORIZED;
+
+    // Kiểm tra loại lỗi
+    if (error.name === 'TokenExpiredError') {
+      message = 'Token đã hết hạn';
+    } else if (error.name === 'JsonWebTokenError') {
+      message = 'Token không hợp lệ';
+    }
+
     return res.status(HTTP_STATUS.UNAUTHORIZED).json({
       success: false,
-      message: error.message === 'jwt expired' ? 'Token đã hết hạn' : 'Token không hợp lệ',
-      code: 'INVALID_TOKEN',
+      message: message,
     });
   }
 };
+
+// ==================== MIDDLEWARE: KIỂM TRA ROLE (ADMIN) ====================
 
 /**
- * Middleware kiểm tra role admin
- * Sử dụng TRONG CÙNG 1 route với authMiddleware
+ * Middleware: Kiểm tra user có role yêu cầu không
+ * Dùng kèm với protect middleware
  * 
- * Ví dụ:
- * router.post('/movies', authMiddleware, adminMiddleware, movieController.create);
+ * Cách dùng:
+ * router.delete('/admin/users', protect, authorize('admin'), deleteUser);
+ * router.put('/moderator/comments', protect, authorize('admin', 'moderator'), approveComment);
+ * 
+ * @param {...string} roles - Danh sách roles được phép
+ * @returns {function} - Middleware function
  */
-const adminMiddleware = (req, res, next) => {
-  if (req.user?.role !== 'admin') {
-    return res.status(HTTP_STATUS.FORBIDDEN).json({
-      success: false,
-      message: MESSAGES.FORBIDDEN,
-      code: 'NOT_ADMIN',
-    });
-  }
+exports.authorize = (...roles) => {
+  return (req, res, next) => {
+    // Kiểm tra user có role không
+    if (!req.user) {
+      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+        success: false,
+        message: MESSAGES.UNAUTHORIZED,
+      });
+    }
 
-  next();
+    // Kiểm tra user.role có nằm trong danh sách roles được phép không
+    if (!roles.includes(req.user.role)) {
+      return res.status(HTTP_STATUS.FORBIDDEN).json({
+        success: false,
+        message: MESSAGES.FORBIDDEN, // 'Bạn không có quyền'
+      });
+    }
+
+    next();
+  };
 };
+
+// ==================== MIDDLEWARE: SHORTCUT ====================
 
 /**
- * Middleware kiểm tra VIP status
- * Sử dụng TRONG CÙNG 1 route với authMiddleware
- * 
- * Ví dụ:
- * router.get('/premium-movies', authMiddleware, vipMiddleware, movieController.getPremium);
+ * Middleware: Kiểm tra admin
+ * Equivalent to: authorize('admin')
  */
-const vipMiddleware = (req, res, next) => {
-  // Kiểm tra nếu có vipEnd và vipEnd > now
-  const hasVIP = req.user?.vipEnd && new Date(req.user.vipEnd) > new Date();
+exports.requireAdmin = exports.authorize('admin');
 
-  if (!hasVIP) {
-    return res.status(HTTP_STATUS.FORBIDDEN).json({
-      success: false,
-      message: MESSAGES.NO_VIP,
-      code: 'NO_VIP',
-    });
-  }
+/**
+ * Middleware: Kiểm tra admin hoặc moderator
+ */
+exports.requireModerator = exports.authorize(USER_ROLES.ADMIN, USER_ROLES.MODERATOR);
 
-  next();
-};
 
-module.exports = {
-  authMiddleware,
-  adminMiddleware,
-  vipMiddleware,
-};
