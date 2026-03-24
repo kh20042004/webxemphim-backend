@@ -76,8 +76,8 @@ const adminMiddleware = (req, res, next) => {
  * router.get('/premium-movies', authMiddleware, vipMiddleware, movieController.getPremium);
  */
 const vipMiddleware = (req, res, next) => {
-  // Kiểm tra nếu có vipEnd và vipEnd > now
-  const hasVIP = req.user?.vipEnd && new Date(req.user.vipEnd) > new Date();
+  // Kiểm tra nếu có expiryDate và expiryDate > now
+  const hasVIP = req.user?.subscription?.expiryDate && new Date(req.user.subscription.expiryDate) > new Date();
 
   if (!hasVIP) {
     return res.status(HTTP_STATUS.FORBIDDEN).json({

@@ -49,13 +49,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// ==================== IMPORT ROUTES (Khi tạo xong route files) ====================
+// ==================== IMPORT ROUTES ====================
 // Mỗi người sẽ thêm routes của mình vào đây
-// VD:
-// app.use('/api/auth', require('./routes/authRoutes'));
-// app.use('/api/movies', require('./routes/movieRoutes'));
-// app.use('/api/comments', require('./routes/commentRoutes'));
-// ...
+app.use('/api/users', require('./routes/userRoutes'));
+app.use('/api/comments', require('./routes/commentRoutes'));
+app.use('/api/ratings', require('./routes/ratingRoutes'));
+app.use('/api/history', require('./routes/historyRoutes'));
 
 // ==================== 404 NOT FOUND ====================
 app.use((req, res) => {
