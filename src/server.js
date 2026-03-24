@@ -50,6 +50,10 @@ app.use(express.json());
 // Parse URL-encoded body
 app.use(express.urlencoded({ extended: true }));
 
+// ==================== SERVE FRONTEND STATIC FILES ====================
+const frontendPath = path.join(__dirname, '../../webxemphim-frontend/frontend');
+app.use(express.static(frontendPath));
+
 // ==================== PASSPORT MIDDLEWARE ====================
 app.use(passport.initialize());
 app.use(passport.session());
@@ -86,6 +90,12 @@ app.use('/api/user', userRoutes);
 // app.use('/api/movies', require('./routes/movieRoutes'));
 // app.use('/api/comments', require('./routes/commentRoutes'));
 // ...
+
+// ==================== SPA FALLBACK - PHỤC VỤ TRANG CHÍNH (OPTIONAL) ====================
+// Nếu bạn có index.html, uncomment dòng này:
+// app.get('/', (req, res) => {
+//   res.sendFile(path.join(frontendPath, 'index.html'));
+// });
 
 // ==================== 404 NOT FOUND ====================
 app.use((req, res) => {
