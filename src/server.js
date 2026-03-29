@@ -89,6 +89,7 @@ app.use('/api/user', userRoutes);
 // Các routes khác (mỗi người thêm vào đây)
 app.use('/api/movies', require('./routes/movieRoutes'));
 app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/admin/movies', require('./routes/admin/movieAdminRoutes'));
 // app.use('/api/comments', require('./routes/commentRoutes'));
 // ...
 
