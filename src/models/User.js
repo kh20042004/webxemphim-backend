@@ -115,6 +115,12 @@ const userSchema = new mongoose.Schema(
         type: Date,
       },
     },
+
+    // ============ Favorites / Phim Yêu Thích ============
+    favorites: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Movie', // Tham chiếu tới Movie model
+    }],
   },
   {
     // Tự động thêm createdAt và updatedAt

@@ -1,24 +1,54 @@
 const Comment = require('../models/Comment');
 const { HTTP_STATUS, USER_ROLES } = require('../config/constants');
+const { paginateQuery, getPaginationParams } = require('../utils/paginationHelper'); // ⭐ Import pagination helper
 
 /**
- * Lấy danh sách bình luận của phim
- * GET /api/comments?movieId=xyz
+ * Lấy danh sách bình luận của phim với pagination
+ * GET /api/comments?movieId=xyz&page=1&limit=10
+ * 
+ * ⭐ CẢI THIỆN: Đã thêm pagination
+ * - ?movieId=xyz&page=1&limit=10 → Trang 1, mỗi trang 10 comments
+ * - ?movieId=xyz&page=2&limit=20 → Trang 2, mỗi trang 20 comments
+ * - Mặc định: page=1, limit=10
+ * - Sort: Mới nhất trước (-createdAt)
  */
 const getCommentsByMovie = async (req, res) => {
   try {
+    // ============ VALIDATE movieId ====================
     const { movieId } = req.query;
     if (!movieId) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({ success: false, message: 'Vui lòng cung cấp movieId' });
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({ 
+        success: false, 
+        message: 'Vui lòng cung cấp movieId' 
+      });
     }
 
-    const comments = await Comment.find({ movieId })
-      .populate('userId', 'username avatar') // Hiển thị tên & ảnh user
-      .sort({ createdAt: -1 }); // Mới nhất lên đầu
+    // ============ PAGINATION PARAMS ====================
+    const { page, limit } = getPaginationParams(req.query);
 
-    res.status(HTTP_STATUS.OK).json({ success: true, count: comments.length, data: comments });
+    // ============ QUERY VỚI PAGINATION ====================
+    const result = await paginateQuery(Comment, { movieId }, {
+      page,
+      limit,
+      sort: { createdAt: -1 }, // Mới nhất lên đầu
+      populate: {
+        path: 'userId',
+        select: 'username avatar fullName', // Hiển thị tên & ảnh user
+      },
+    });
+
+    // ============ TRẢ VỀ RESPONSE ====================
+    return res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: `Lấy danh sách bình luận thành công`,
+      ...result, // Spread data và pagination
+    });
+
   } catch (error) {
-    res.status(HTTP_STATUS.SERVER_ERROR).json({ success: false, message: error.message });
+    res.status(HTTP_STATUS.SERVER_ERROR).json({ 
+      success: false, 
+      message: error.message 
+    });
   }
 };
 

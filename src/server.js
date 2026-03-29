@@ -83,6 +83,7 @@ const userRoutes = require('./routes/userRoutes');
 const commentRoutes = require('./routes/commentRoutes');
 const ratingRoutes = require('./routes/ratingRoutes');
 const historyRoutes = require('./routes/historyRoutes');
+const favoritesRoutes = require('./routes/favoritesRoutes'); // Phim yêu thích
 
 // ==================== MOUNT ROUTES ====================
 // Xác thực & Tài khoản người dùng
@@ -94,10 +95,89 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/history', historyRoutes);
 
-// Movie routes (Tuấn Anh)
+// Phim yêu thích - thêm/xóa/xem danh sách phim yêu thích
+app.use('/api/favorites', favoritesRoutes);
+
+// Movie routes (Tuấn Anh + Nghĩa + Thu Hà)
+// /api/movies          → Danh sách phim (filter, pagination)
+// /api/movies/trending → Phim xem nhiều nhất (NGHĨA - trang chủ)
+// /api/movies/new      → Phim mới nhất (NGHĨA - trang chủ)
+// /api/movies/:id      → Chi tiết phim (TUẤN ANH)
 app.use('/api/movies', require('./routes/movieRoutes'));
+
+// Upload ảnh/video lên Cloudinary (TUẤN ANH)
+// POST /api/upload → trả về URL sau khi upload thành công
 app.use('/api/upload', require('./routes/uploadRoutes'));
+
+// Admin quản lý phim (TUẤN ANH - chỉ role admin)
+// POST/PUT/DELETE /api/admin/movies → thêm/sửa/xóa phim
 app.use('/api/admin/movies', require('./routes/admin/movieAdminRoutes'));
+
+// ------------------------------------------------------------------
+// GET /api/categories
+// Lấy danh sách tất cả thể loại phim đang có trong DB (NGHĨA)
+// Logic: Movie.distinct('category') → unique categories, sắp xếp A-Z
+// Dùng cho: Menu điều hướng trang chủ, dropdown filter
+// ------------------------------------------------------------------
+app.get('/api/categories', require('./controllers/movieController').getCategories);
+
+// ------------------------------------------------------------------
+// GET /api/search?q=keyword
+// Tìm kiếm phim theo từ khóa (THU HÀ)
+// Logic: Dùng MongoDB $regex để tìm theo tên phim, có phân trang
+// VD: /api/search?q=avengers&page=1&limit=12
+// Dùng cho: Thanh tìm kiếm header, trang search.html
+// ------------------------------------------------------------------
+app.get('/api/search', require('./controllers/movieController').searchMovies);
+
+
+// ==================== SHORTCUT ROUTES FOR PAGES ====================
+// Cho phép truy cập trực tiếp /movies.html thay vì /pages/movies.html
+const pagesPath = path.join(frontendPath, 'src/pages');
+
+app.get('/movies.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'movies.html'));
+});
+
+app.get('/login.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'login.html'));
+});
+
+app.get('/register.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'register.html'));
+});
+
+app.get('/detail.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'detail.html'));
+});
+
+app.get('/profile.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'profile.html'));
+});
+
+app.get('/history.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'history.html'));
+});
+
+app.get('/favorites.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'favorites.html'));
+});
+
+app.get('/settings.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'settings.html'));
+});
+
+app.get('/subscription.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'subscription.html'));
+});
+
+app.get('/search.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'search.html'));
+});
+
+app.get('/admin.html', (req, res) => {
+  res.sendFile(path.join(pagesPath, 'admin.html'));
+});
 
 // ==================== SPA FALLBACK - PHỤC VỤ TRANG CHÍNH (OPTIONAL) ====================
 // Nếu bạn có index.html, uncomment dòng này:

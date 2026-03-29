@@ -14,8 +14,10 @@ const config = {
   MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/webxemphim',
 
   // ============ Cấu hình JWT (Authentication) ============
-  JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key', // Key để mã hóa JWT Token
-  JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',              // Token hết hạn sau bao lâu
+  JWT_SECRET: process.env.JWT_SECRET || 'your-secret-key',         // Key để mã hóa JWT Token
+  JWT_EXPIRE: process.env.JWT_EXPIRE || '7d',                      // Access token hết hạn sau bao lâu (mặc định 7 ngày)
+  ACCESS_TOKEN_EXPIRE: process.env.ACCESS_TOKEN_EXPIRE || '15m',   // Access token expire (15 phút)
+  REFRESH_TOKEN_EXPIRE: process.env.REFRESH_TOKEN_EXPIRE || '30d', // Refresh token expire (30 ngày)
 
   // ============ Cấu hình Cloudinary (Upload file) ============
   CLOUDINARY_NAME: process.env.CLOUDINARY_NAME,            // Tên Cloudinary account
@@ -39,6 +41,13 @@ const config = {
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
   GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback',
+
+  // ============ Cấu hình Redis (Caching - Tuỳ chọn) ============
+  // KHÔNG có giá trị mặc định: nếu .env không set REDIS_URL → undefined → Redis bị tắt
+  // Để bật: thêm REDIS_URL=redis://localhost:6379 vào .env
+  REDIS_URL: process.env.REDIS_URL || null,           // null = tắt Redis hoàn toàn
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD || '',   // Password Redis (nếu có)
+  REDIS_TTL: parseInt(process.env.REDIS_TTL) || 300, // Default TTL (5 phút)
 };
 
 module.exports = config;

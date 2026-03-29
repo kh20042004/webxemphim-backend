@@ -7,6 +7,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/environment');
 const User = require('../models/User');
+const RefreshToken = require('../models/RefreshToken'); // ⭐ Import RefreshToken model
 const { HTTP_STATUS, MESSAGES, USER_ROLES } = require('../config/constants');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
 const { sendResetPasswordEmail } = require('../utils/emailService');
@@ -14,16 +15,25 @@ const { sendResetPasswordEmail } = require('../utils/emailService');
 // ==================== HỆ THỐNG TẠO TOKEN JWT ====================
 
 /**
- * Hàm tạo JWT token
+ * Hàm tạo Access Token (JWT - thời hạn ngắn 15 phút)
+ * @param {string} userId - ID của user
+ * @returns {string} - Access token
+ */
+const generateAccessToken = (userId) => {
+  return jwt.sign(
+    { id: userId }, // Payload
+    config.JWT_SECRET, // Secret key
+    { expiresIn: config.ACCESS_TOKEN_EXPIRE } // 15 phút
+  );
+};
+
+/**
+ * Hàm tạo JWT token (cũ - giữ lại cho backward compatibility)
  * @param {string} userId - ID của user
  * @returns {string} - JWT token
  */
 const generateToken = (userId) => {
-  return jwt.sign(
-    { id: userId }, // Payload
-    config.JWT_SECRET, // Secret key
-    { expiresIn: config.JWT_EXPIRE } // Options (7d)
-  );
+  return generateAccessToken(userId);
 };
 
 // ==================== API: ĐĂNG KÝ TÀI KHOẢN ====================
@@ -85,14 +95,22 @@ exports.register = async (req, res, next) => {
       avatar: null,
     });
 
-    // ============ TẠO TOKEN ====================
-    const token = generateToken(user._id);
+    // ============ TẠO ACCESS TOKEN & REFRESH TOKEN ====================
+    const accessToken = generateAccessToken(user._id);
+    
+    // Tạo refresh token và lưu vào DB
+    const { token: refreshToken } = await RefreshToken.createToken(user._id, {
+      userAgent: req.get('user-agent'),
+      ip: req.ip || req.connection.remoteAddress,
+      platform: 'web',
+    });
 
     // ============ TRẢ VỀ RESPONSE ====================
     return sendSuccess(
       res,
       {
-        token,
+        accessToken,      // ⭐ Access token (15 phút)
+        refreshToken,     // ⭐ Refresh token (30 ngày)
         user: user.toJSON(), // Không trả về password
       },
       'Đăng ký thành công'
@@ -151,14 +169,22 @@ exports.login = async (req, res, next) => {
     user.lastLogin = new Date();
     await user.save();
 
-    // ============ TẠO TOKEN ====================
-    const token = generateToken(user._id);
+    // ============ TẠO ACCESS TOKEN & REFRESH TOKEN ====================
+    const accessToken = generateAccessToken(user._id);
+    
+    // Tạo refresh token và lưu vào DB
+    const { token: refreshToken } = await RefreshToken.createToken(user._id, {
+      userAgent: req.get('user-agent'),
+      ip: req.ip || req.connection.remoteAddress,
+      platform: 'web',
+    });
 
     // ============ TRẢ VỀ RESPONSE ====================
     return sendSuccess(
       res,
       {
-        token,
+        accessToken,      // ⭐ Access token (15 phút)
+        refreshToken,     // ⭐ Refresh token (30 ngày)
         user: user.toJSON(), // Không trả về password
       },
       'Đăng nhập thành công'
@@ -198,24 +224,28 @@ exports.getMe = async (req, res, next) => {
 
 /**
  * POST /api/auth/logout
- * Mô tả: Đăng xuất (xóa token ở client)
+ * Mô tả: Đăng xuất - Thu hồi refresh token
  * Headers: Authorization: Bearer <token>
+ * Body: { refreshToken } (optional - nếu muốn revoke token cụ thể)
  * Response: { success, message }
  * Middleware: protect (yêu cầu đăng nhập)
  * 
- * Note: JWT là stateless, nên server không cần xóa token
- * Client sẽ tự xóa token từ localStorage/sessionStorage
+ * ⭐ CẢI THIỆN: Giờ đây logout sẽ revoke refresh token trong DB
  */
 exports.logout = async (req, res, next) => {
   try {
-    // ============ LOGIC ====================
-    // JWT là stateless, nên server không cần làm gì
-    // Client sẽ tự xóa token từ localStorage
-
-    // Nếu muốn logout "hard" (blacklist token), cần tạo Redis/DB list
-    // Nhưng bây giờ thì đơn giản là:
-    // - Client xóa token
-    // - Server trả về success
+    const { refreshToken } = req.body;
+    
+    // ============ REVOKE REFRESH TOKEN ====================
+    if (refreshToken) {
+      // Nếu client gửi refresh token, revoke token đó
+      await RefreshToken.revokeToken(refreshToken, 'logout');
+      console.log('✅ Đã revoke refresh token khi logout');
+    } else {
+      // Nếu không gửi, revoke tất cả tokens của user (logout all devices)
+      const revokedCount = await RefreshToken.revokeAllUserTokens(req.user._id, 'logout');
+      console.log(`✅ Đã revoke ${revokedCount} refresh tokens của user`);
+    }
 
     // ============ TRẢ VỀ RESPONSE ====================
     return sendSuccess(
@@ -444,10 +474,23 @@ exports.googleCallback = async (req, res, next) => {
     console.log('✅ User found:', user._id);
 
     // ============ TẠO JWT TOKEN ====================
-    let token;
+    let accessToken;
+    let refreshToken;
+    
     try {
-      token = generateToken(user._id);
-      console.log('✅ Token generated successfully');
+      // Tạo access token (15 phút)
+      accessToken = generateAccessToken(user._id);
+      console.log('✅ Access token generated successfully');
+      
+      // Tạo refresh token (30 ngày) và lưu vào DB
+      const refreshTokenData = await RefreshToken.createToken(user._id, {
+        userAgent: req.get('user-agent'),
+        ip: req.ip || req.connection.remoteAddress,
+        platform: 'web',
+      });
+      refreshToken = refreshTokenData.token;
+      console.log('✅ Refresh token generated successfully');
+      
     } catch (tokenError) {
       console.error('❌ Token generation error:', tokenError.message);
       throw tokenError;
@@ -463,12 +506,12 @@ exports.googleCallback = async (req, res, next) => {
       // Continue anyway, don't fail the whole callback
     }
 
-    console.log('✅ Google OAuth Success - Redirecting to:', `${config.FRONTEND_URL}?token=${token}`);
+    console.log('✅ Google OAuth Success - Redirecting to:', `${config.FRONTEND_URL}?accessToken=${accessToken}&refreshToken=${refreshToken}`);
     
-    // ============ REDIRECT TỚI FRONTEND VỚI TOKEN ====================
-    // Send only token - frontend will fetch user data using /api/auth/me
+    // ============ REDIRECT TỚI FRONTEND VỚI TOKENS ====================
+    // Gửi cả access token và refresh token
     res.redirect(
-      `${config.FRONTEND_URL}?token=${token}`
+      `${config.FRONTEND_URL}?accessToken=${accessToken}&refreshToken=${refreshToken}`
     );
     
     console.log('========== GOOGLE CALLBACK END ==========\n');
@@ -476,6 +519,215 @@ exports.googleCallback = async (req, res, next) => {
     console.error('\n❌ GOOGLE CALLBACK ERROR:', error.message);
     console.error('Stack:', error.stack);
     console.error('=========================================\n');
+    next(error);
+  }
+};
+
+// ==================== API: REFRESH ACCESS TOKEN ====================
+
+/**
+ * POST /api/auth/refresh-token
+ * Mô tả: Tạo access token mới từ refresh token
+ * Body: { refreshToken }
+ * Response: { success, accessToken, refreshToken }
+ * 
+ * ⭐ REFRESH TOKEN FLOW:
+ * 1. Client gửi refresh token
+ * 2. Server verify refresh token (kiểm tra DB, chưa revoke, chưa hết hạn)
+ * 3. Server tạo access token mới
+ * 4. Server rotate refresh token (tạo mới, revoke cái cũ) - Best practice
+ * 5. Trả về cả 2 tokens mới
+ */
+exports.refreshAccessToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    // ============ VALIDATE DỮ LIỆU ====================
+    if (!refreshToken) {
+      return sendError(
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        'Refresh token là bắt buộc'
+      );
+    }
+
+    // ============ VERIFY REFRESH TOKEN ====================
+    const refreshTokenDoc = await RefreshToken.verifyToken(refreshToken);
+
+    if (!refreshTokenDoc) {
+      return sendError(
+        res,
+        HTTP_STATUS.UNAUTHORIZED,
+        'Refresh token không hợp lệ hoặc đã hết hạn'
+      );
+    }
+
+    // ============ LẤY USER ====================
+    const user = refreshTokenDoc.userId;
+
+    // Kiểm tra user còn active không
+    if (!user.isActive) {
+      return sendError(
+        res,
+        HTTP_STATUS.FORBIDDEN,
+        'Tài khoản đã bị vô hiệu hóa'
+      );
+    }
+
+    // ============ TẠO ACCESS TOKEN MỚI ====================
+    const newAccessToken = generateAccessToken(user._id);
+
+    // ============ ROTATE REFRESH TOKEN (Best Practice) ====================
+    // Tạo refresh token mới và revoke cái cũ
+    // Lý do: Tăng bảo mật, phát hiện token reuse attack
+    const { token: newRefreshToken } = await RefreshToken.rotateToken(
+      refreshToken,
+      {
+        userAgent: req.get('user-agent'),
+        ip: req.ip || req.connection.remoteAddress,
+        platform: 'web',
+      }
+    );
+
+    console.log(`✅ Token refreshed cho user: ${user.email}`);
+
+    // ============ TRẢ VỀ TOKENS MỚI ====================
+    return sendSuccess(
+      res,
+      {
+        accessToken: newAccessToken,    // Access token mới (15 phút)
+        refreshToken: newRefreshToken,  // Refresh token mới (30 ngày)
+      },
+      'Refresh token thành công'
+    );
+  } catch (error) {
+    // Nếu lỗi do refresh token (invalid, expired, v.v.)
+    if (error.message.includes('Token')) {
+      return sendError(
+        res,
+        HTTP_STATUS.UNAUTHORIZED,
+        error.message
+      );
+    }
+    next(error);
+  }
+};
+
+// ==================== API: REVOKE REFRESH TOKEN ====================
+
+/**
+ * POST /api/auth/revoke-token
+ * Mô tả: Thu hồi (revoke) refresh token cụ thể
+ * Body: { refreshToken }
+ * Headers: Authorization: Bearer <accessToken>
+ * Middleware: protect (yêu cầu đăng nhập)
+ * Response: { success, message }
+ * 
+ * Use case: User muốn logout khỏi 1 thiết bị cụ thể
+ */
+exports.revokeToken = async (req, res, next) => {
+  try {
+    const { refreshToken } = req.body;
+
+    // ============ VALIDATE DỮ LIỆU ====================
+    if (!refreshToken) {
+      return sendError(
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        'Refresh token là bắt buộc'
+      );
+    }
+
+    // ============ REVOKE TOKEN ====================
+    const success = await RefreshToken.revokeToken(refreshToken, 'manual');
+
+    if (!success) {
+      return sendError(
+        res,
+        HTTP_STATUS.NOT_FOUND,
+        'Không tìm thấy refresh token'
+      );
+    }
+
+    // ============ TRẢ VỀ RESPONSE ====================
+    return sendSuccess(
+      res,
+      null,
+      'Đã thu hồi refresh token thành công'
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== API: REVOKE ALL TOKENS (LOGOUT ALL DEVICES) ====================
+
+/**
+ * POST /api/auth/logout-all
+ * Mô tả: Đăng xuất khỏi tất cả thiết bị
+ * Headers: Authorization: Bearer <accessToken>
+ * Middleware: protect (yêu cầu đăng nhập)
+ * Response: { success, message, revokedCount }
+ * 
+ * Use case: 
+ * - User nghi ngờ tài khoản bị hack
+ * - User muốn đăng xuất khỏi tất cả thiết bị
+ * - User đổi password
+ */
+exports.logoutAll = async (req, res, next) => {
+  try {
+    // ============ REVOKE TẤT CẢ TOKENS CỦA USER ====================
+    const revokedCount = await RefreshToken.revokeAllUserTokens(
+      req.user._id,
+      'logout_all'
+    );
+
+    console.log(`✅ User ${req.user.email} đã logout khỏi ${revokedCount} thiết bị`);
+
+    // ============ TRẢ VỀ RESPONSE ====================
+    return sendSuccess(
+      res,
+      { revokedCount },
+      `Đã đăng xuất khỏi ${revokedCount} thiết bị`
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ==================== API: GET ACTIVE SESSIONS (DEVICES) ====================
+
+/**
+ * GET /api/auth/sessions
+ * Mô tả: Lấy danh sách thiết bị đang đăng nhập
+ * Headers: Authorization: Bearer <accessToken>
+ * Middleware: protect (yêu cầu đăng nhập)
+ * Response: { success, data: [sessions] }
+ * 
+ * Use case: User muốn xem đang login ở những thiết bị nào
+ */
+exports.getActiveSessions = async (req, res, next) => {
+  try {
+    // ============ LẤY TẤT CẢ ACTIVE TOKENS ====================
+    const sessions = await RefreshToken.getUserActiveTokens(req.user._id);
+
+    // ============ FORMAT RESPONSE ====================
+    const formattedSessions = sessions.map(session => ({
+      _id: session._id,
+      device: session.deviceInfo?.userAgent || 'Unknown device',
+      platform: session.deviceInfo?.platform || 'web',
+      ip: session.deviceInfo?.ip || 'Unknown IP',
+      createdAt: session.createdAt,
+      expiresAt: session.expiresAt,
+    }));
+
+    // ============ TRẢ VỀ RESPONSE ====================
+    return sendSuccess(
+      res,
+      formattedSessions,
+      `Tìm thấy ${formattedSessions.length} phiên đăng nhập active`
+    );
+  } catch (error) {
     next(error);
   }
 };

@@ -46,6 +46,15 @@ router.post('/forgot-password', authController.forgotPassword);
  */
 router.post('/reset-password', authController.resetPassword);
 
+/**
+ * POST /api/auth/refresh-token
+ * Mô tả: Tạo access token mới từ refresh token
+ * Body: { refreshToken }
+ * Response: { success, accessToken, refreshToken }
+ * ⭐ NEW: Refresh token endpoint
+ */
+router.post('/refresh-token', authController.refreshAccessToken);
+
 // ==================== PROTECTED ROUTES (CẦN ĐĂNG NHẬP) ====================
 
 /**
@@ -59,12 +68,44 @@ router.get('/me', protect, authController.getMe);
 
 /**
  * POST /api/auth/logout
- * Mô tả: Đăng xuất
+ * Mô tả: Đăng xuất - revoke refresh token
  * Headers: Authorization: Bearer <token>
+ * Body: { refreshToken } (optional)
  * Response: { success, message }
  * Middleware: protect (kiểm tra JWT token)
  */
 router.post('/logout', protect, authController.logout);
+
+/**
+ * POST /api/auth/revoke-token
+ * Mô tả: Thu hồi refresh token cụ thể
+ * Headers: Authorization: Bearer <token>
+ * Body: { refreshToken }
+ * Response: { success, message }
+ * Middleware: protect
+ * ⭐ NEW: Revoke specific token
+ */
+router.post('/revoke-token', protect, authController.revokeToken);
+
+/**
+ * POST /api/auth/logout-all
+ * Mô tả: Đăng xuất khỏi tất cả thiết bị
+ * Headers: Authorization: Bearer <token>
+ * Response: { success, message, revokedCount }
+ * Middleware: protect
+ * ⭐ NEW: Logout from all devices
+ */
+router.post('/logout-all', protect, authController.logoutAll);
+
+/**
+ * GET /api/auth/sessions
+ * Mô tả: Lấy danh sách thiết bị đang đăng nhập
+ * Headers: Authorization: Bearer <token>
+ * Response: { success, data: [sessions] }
+ * Middleware: protect
+ * ⭐ NEW: Get active sessions
+ */
+router.get('/sessions', protect, authController.getActiveSessions);
 
 // ==================== GOOGLE OAUTH ROUTES ====================
 

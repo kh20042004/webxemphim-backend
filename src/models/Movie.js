@@ -50,7 +50,14 @@ const movieSchema = new mongoose.Schema(
         },
         type: {
             type: String,
-            enum: ['Phim lẻ', 'Phim bộ', 'TV Show', 'Hoạt hình'],
+            // Hỗ trợ cả 2 format:
+            // - Format tiếng Việt (mới): 'Phim lẻ', 'Phim bộ', 'TV Show', 'Hoạt hình'
+            // - Format snake_case (cũ có trong DB): 'phim_le', 'phim_bo', 'TV Show'
+            // Thêm cả 2 loại để tương thích ngược với dữ liệu đã có trong MongoDB
+            enum: [
+                'Phim lẻ', 'Phim bộ', 'TV Show', 'Hoạt hình',  // Format mới (hiển thị)
+                'phim_le', 'phim_bo', 'phim_bo_viet', 'hoat_hinh', // Format cũ (DB cũ)
+            ],
             default: 'Phim lẻ'
         },
         episodes: [episodeSchema],

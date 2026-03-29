@@ -43,11 +43,11 @@ const upload = multer({
 });
 
 // 2. API UPLOAD ẢNH POSTER (POST /api/upload/poster)
-// TẠM THỜI TẮT BẢO MẬT ĐỂ BẠN DỄ TEST: Bỏ comment 2 dòng protect, requireAdmin khi ráp code với team
+// Chỉ admin mới được upload ảnh poster lên Cloudinary
 router.post(
     '/poster',
-    // protect,        <-- (Chặn chưa cho test nếu ko có token)
-    // requireAdmin,   <-- (Chặn chưa cho test nếu ko có token)
+    protect,        // Bước 1: Kiểm tra đăng nhập (JWT token hợp lệ)
+    requireAdmin,   // Bước 2: Kiểm tra role phải là 'admin'
     upload.single('File'),
     async (req, res, next) => {
         try {
@@ -59,11 +59,12 @@ router.post(
                 filename: `poster-${Date.now()}`,
             });
 
-            // Xóa file tạm trong máy
+            // Xóa file tạm trong máy sau khi đã upload lên Cloudinary thành công
             fs.unlinkSync(req.file.path);
 
             return sendSuccess(res, { url: result.url, publicId: result.publicId }, 'Upload poster thành công');
         } catch (error) {
+            // Nếu lỗi, vẫn xóa file tạm để không ứ đọng
             if (req.file) fs.unlinkSync(req.file.path);
             next(error);
         }
@@ -71,10 +72,11 @@ router.post(
 );
 
 // 3. API UPLOAD VIDEO TẬP PHIM (POST /api/upload/video)
+// Chỉ admin mới được upload video lên Cloudinary
 router.post(
     '/video',
-    // protect,
-    // requireAdmin,
+    protect,        // Bước 1: Kiểm tra đăng nhập (JWT token hợp lệ)
+    requireAdmin,   // Bước 2: Kiểm tra role phải là 'admin'
     upload.single('File'),
     async (req, res, next) => {
         try {
@@ -85,10 +87,12 @@ router.post(
                 filename: `episode-${Date.now()}`,
             });
 
+            // Xóa file tạm trong máy sau khi đã upload lên Cloudinary thành công
             fs.unlinkSync(req.file.path);
 
             return sendSuccess(res, { url: result.url, publicId: result.publicId, duration: result.duration }, 'Upload video thành công');
         } catch (error) {
+            // Nếu lỗi, vẫn xóa file tạm để không ứ đọng
             if (req.file) fs.unlinkSync(req.file.path);
             next(error);
         }
