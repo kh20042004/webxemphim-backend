@@ -94,8 +94,10 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/history', historyRoutes);
 
-// Lưu ý: Thêm route mới vào đây khi cần
-// app.use('/api/movies', require('./routes/movieRoutes'));
+// Movie routes (Tuấn Anh)
+app.use('/api/movies', require('./routes/movieRoutes'));
+app.use('/api/upload', require('./routes/uploadRoutes'));
+app.use('/api/admin/movies', require('./routes/admin/movieAdminRoutes'));
 
 // ==================== SPA FALLBACK - PHỤC VỤ TRANG CHÍNH (OPTIONAL) ====================
 // Nếu bạn có index.html, uncomment dòng này:
