@@ -11,7 +11,7 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/environment');
 const User = require('../models/User');
-const { HTTP_STATUS, MESSAGES, USER_ROLES } = require('../config/constants');
+const { HTTP_STATUS, MESSAGES, USER_ROLES, VIP_PLANS } = require('../config/constants');
 
 // ==================== MIDDLEWARE: KIỂM TRA ĐĂNG NHẬP ====================
 
@@ -117,6 +117,34 @@ exports.authorize = (...roles) => {
 
     next();
   };
+};
+
+// ==================== MIDDLEWARE: VIP CHECK ====================
+
+/**
+ * Middleware: Kiểm tra user có VIP còn hạn không
+ * Nếu không có VIP hoặc hết hạn: Trả về 403 Forbidden
+ * 
+ * Cách dùng:
+ * router.get('/premium-feature', protect, vipMiddleware, premiumController);
+ */
+exports.vipMiddleware = (req, res, next) => {
+  // Kiểm tra nếu có subscription với expiryDate > now
+  // Lưu ý: gói miễn phí là VIP_PLANS.FREE, không phải USER_ROLES.FREE (USER_ROLES chỉ có user/admin/moderator)
+  const hasValidVIP =
+    req.user?.subscription &&
+    req.user.subscription.plan !== VIP_PLANS.FREE &&
+    req.user.subscription.expiryDate &&
+    new Date(req.user.subscription.expiryDate) > new Date();
+
+  if (!hasValidVIP) {
+    return res.status(HTTP_STATUS.FORBIDDEN).json({
+      success: false,
+      message: 'Tính năng này yêu cầu VIP còn hạn',
+    });
+  }
+
+  next();
 };
 
 // ==================== MIDDLEWARE: SHORTCUT ====================

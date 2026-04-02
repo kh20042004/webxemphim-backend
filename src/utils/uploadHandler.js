@@ -225,4 +225,6 @@ exports.getVideoThumbnail = (publicId, seconds = 0) => {
   });
 };
 
-module.exports;
+// Lưu ý: Tất cả các hàm đã được export ở trên bằng cú pháp exports.xxx
+// Không cần ghi lại module.exports ở đây
+

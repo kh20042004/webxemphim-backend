@@ -236,11 +236,24 @@ exports.logout = async (req, res, next) => {
  * Body: { email }
  * Response: { success, message }
  */
+/**
+ * POST /api/auth/forgot-password - BƯỚC 1: GỬI MÃ RESET PASSWORD QUA EMAIL
+ * 
+ * Quy trình:
+ * 1. User gửi email
+ * 2. Server tạo mã reset password, lưu vào DB
+ * 3. Server gửi mã qua email
+ * 💡 TIP: Chỉ hoạt động khi Gmail App Password đã cấu hình đúng
+ * 
+ * Body: { email }
+ * Response: { success, message }
+ */
 exports.forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
 
     // ============ VALIDATE DỮ LIỆU ====================
+    // Kiểm tra user nhập email chưa
     if (!email) {
       return sendError(
         res,
@@ -250,11 +263,12 @@ exports.forgotPassword = async (req, res, next) => {
     }
 
     // ============ TÌM USER THEO EMAIL ====================
+    // Tìm user từ database
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      // Vì lý do bảo mật, ta không nói user không tồn tại
-      // Chỉ trả về thông báo chung
+      // ⚠️ Bảo mật: Không nói email không tồn tại (vì vậy kẻ xấu không biết email nào đã dùng)
+      // Luôn trả về thông báo chung
       return sendSuccess(
         res,
         null,
@@ -262,30 +276,39 @@ exports.forgotPassword = async (req, res, next) => {
       );
     }
 
-    // ============ TẠO RESET PASSWORD TOKEN ====================
+    // ============ TẠO MÃ RESET PASSWORD ====================
+    // Gọi method từ User model - tạo token 6 chữ số
+    // Token này sẽ được gửi qua email
     const resetToken = user.createPasswordResetToken();
     
-    // Lưu token vào DB (không await save ở đây, vì còn cần gửi email)
+    // Lưu token vào database (validateBeforeSave: false tránh validate các field khác)
     await user.save({ validateBeforeSave: false });
 
     // ============ GỬI EMAIL ====================
+    // 📧 Dùng Nodemailer + Gmail SMTP để gửi mã reset password
+    // ❌ Nếu email service lỗi, xóa token, không lưu trạng thái
     try {
       await sendResetPasswordEmail(user.email, resetToken);
+      console.log(`${new Date().toISOString()} - ✅ Email reset password đã gửi tới: ${user.email}`);
     } catch (emailError) {
-      console.error('Email sending error:', emailError);
-      // Xóa reset token nếu gửi email thất bại
+      // Lỗi gửi email - xóa token không hợp lệ
+      console.error(`${new Date().toISOString()} - ❌ Lỗi gửi email reset password:`, emailError.message);
+      
+      // Xóa reset token nếu gửi email thất bại (tránh user spam request)
       user.resetPasswordToken = null;
       user.resetPasswordExpire = null;
       await user.save({ validateBeforeSave: false });
       
+      // Trả về lỗi cho frontend
       return sendError(
         res,
         HTTP_STATUS.INTERNAL_SERVER_ERROR,
-        'Không thể gửi email. Vui lòng thử lại sau.'
+        'Không thể gửi email. Kiểm tra: 1. Gmail credentials trong .env 2. Mạng internet 📧'
       );
     }
 
-    // ============ TRẢ VỀ RESPONSE ====================
+    // ============ TRẢ VỀ RESPONSE THÀNH CÔNG ====================
+    // Không nên nói email tồn tại hay không (lý do bảo mật)
     return sendSuccess(
       res,
       { email: user.email },
@@ -299,8 +322,14 @@ exports.forgotPassword = async (req, res, next) => {
 // ==================== API: RESET MẬT KHẨU - BƯỚC 2 ====================
 
 /**
- * POST /api/auth/reset-password
- * Mô tả: Đặt lại mật khẩu bằng mã reset password
+ * POST /api/auth/reset-password - BƯỚC 2: XÁC NHẬN MÃ VÀ ĐẶT MẬT KHẨU MỚI
+ * 
+ * Quy trình:
+ * 1. User nhận email với mã 6 chữ số
+ * 2. User nhập mã + mật khẩu mới
+ * 3. Server xác minh mã (phải đúng và chưa hết hạn)
+ * 4. Server lưu mật khẩu mới (đã hash)
+ * 
  * Body: { email, code, newPassword, confirmPassword }
  * Response: { success, message }
  */
@@ -309,14 +338,16 @@ exports.resetPassword = async (req, res, next) => {
     const { email, code, newPassword, confirmPassword } = req.body;
 
     // ============ VALIDATE DỮ LIỆU ====================
+    // Kiểm tra tất cả field bắt buộc có được gửi không
     if (!email || !code || !newPassword || !confirmPassword) {
       return sendError(
         res,
         HTTP_STATUS.BAD_REQUEST,
-        'Vui lòng nhập đầy đủ thông tin'
+        'Vui lòng nhập đầy đủ thông tin (email, code, newPassword, confirmPassword)'
       );
     }
 
+    // Kiểm tra 2 password có khớp không
     if (newPassword !== confirmPassword) {
       return sendError(
         res,
@@ -325,6 +356,7 @@ exports.resetPassword = async (req, res, next) => {
       );
     }
 
+    // Kiểm tra mật khẩu có đủ dài không (ít nhất 6 ký tự)
     if (newPassword.length < 6) {
       return sendError(
         res,
@@ -333,36 +365,50 @@ exports.resetPassword = async (req, res, next) => {
       );
     }
 
-    // ============ TÌM USER THEO EMAIL VỚI RESET TOKEN ====================
+    // ============ XÁC MINH MÃ RESET PASSWORD ====================
+    // Mã được gửi qua email là plaintext 6 chữ số
+    // Nhưng lưu trong DB đã hash (bảo mật)
+    // Cần hash mã người dùng gửi lại và so sánh
     const crypto = require('crypto');
     const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
 
+    // Tìm user với 3 điều kiện:
+    // 1. Email khớp
+    // 2. Reset token (mã hash) khớp
+    // 3. Reset token chưa hết hạn (resetPasswordExpire > hiện tại)
     const user = await User.findOne({
       email: email.toLowerCase(),
       resetPasswordToken: hashedCode,
-      resetPasswordExpire: { $gt: new Date() } // Token chưa hết hạn
+      resetPasswordExpire: { $gt: new Date() } // $gt = greater than (>)
     }).select('+password');
 
+    // Nếu không tìm được user hoặc token hết hạn
     if (!user) {
       return sendError(
         res,
         HTTP_STATUS.UNAUTHORIZED,
-        'Mã reset password không hợp lệ hoặc đã hết hạn'
+        'Mã reset password không hợp lệ hoặc đã hết hạn (15 phút)'
       );
     }
 
-    // ============ CẬP NHẬT MẬT KHẨU ====================
+    // ============ CẬP NHẬT MẬT KHẨU MỚI ====================
+    // Gán mật khẩu mới - lưu ý: sẽ được hash tự động bởi pre('save') middleware
     user.password = newPassword;
+    
+    // Xóa mã reset password (chỉ dùng 1 lần thôi)
     user.resetPasswordToken = null;
     user.resetPasswordExpire = null;
     
+    // Lưu vào database - password sẽ được hash tự động
     await user.save();
 
-    // ============ TRẢ VỀ RESPONSE ====================
+    // ============ TRẢ VỀ RESPONSE THÀNH CÔNG ====================
+    console.log(`${new Date().toISOString()} - ✅ User ${email} đã đặt lại mật khẩu thành công`);
+    
     return sendSuccess(
       res,
       null,
-      'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.'
+      'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại với mật khẩu mới.'
     );
   } catch (error) {
     next(error);

@@ -8,26 +8,39 @@ const nodemailer = require('nodemailer');
 const config = require('../config/environment');
 
 // ==================== KHỞI TẠO TRANSPORTER ====================
+// Cấu hình kết nối tới Gmail SMTP để gửi email
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  host: config.SMTP_HOST,
-  port: config.SMTP_PORT,
-  secure: false, // TLS (587)
+  host: config.SMTP_HOST,                    // smtp.gmail.com
+  port: config.SMTP_PORT,                    // 587 (TLS)
+  secure: false,                             // Dùng TLS thay vì SSL
   auth: {
-    user: config.SMTP_FROM_EMAIL,
-    pass: config.SMTP_FROM_PASSWORD,
+    user: config.SMTP_FROM_EMAIL,            // Email Gmail (vd: tk04052k4@gmail.com)
+    pass: config.SMTP_FROM_PASSWORD,         // App Password từ Google (16 ký tự, không phải password thường)
   },
 });
 
-// ==================== TEST CONNECTION ====================
+// ==================== TEST KẾT NỐI EMAIL ====================
+// Kiểm tra xem Gmail credentials có hợp lệ không khi app khởi động
 
-// Test kết nối khi app start
 transporter.verify((error, success) => {
   if (error) {
-    console.log('❌ Email service error:', error);
+    // ❌ Lỗi xác thực - có thể là:
+    // 1. SMTP_FROM_PASSWORD sai hoặc chưa được set
+    // 2. Password là Gmail password thường (sai!) - phải dùng App Password
+    // 3. Gmail account chưa bật 2-Step Verification
+    console.log('❌ Lỗi email service - xác thực Gmail thất bại:');
+    console.log('   Kiểm tra:');
+    console.log('   1. SMTP_FROM_EMAIL = ' + config.SMTP_FROM_EMAIL);
+    console.log('   2. SMTP_FROM_PASSWORD được set trong .env chưa?');
+    console.log('   3. Password phải là App Password (16 ký tự), KHÔNG phải Gmail password thường');
+    console.log('   4. Hướng dẫn lấy App Password: https://myaccount.google.com/apppasswords');
+    console.log('');
+    console.log('   Chi tiết lỗi:', error.message);
   } else {
-    console.log('✅ Email service ready');
+    // ✅ Kết nối thành công - email service sẵn sàng
+    console.log('✅ Email service sẵn sàng - có thể gửi email reset password');
   }
 });
 

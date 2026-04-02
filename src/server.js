@@ -80,16 +80,22 @@ app.get('/api/health', (req, res) => {
 // Import các route files
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const commentRoutes = require('./routes/commentRoutes');
+const ratingRoutes = require('./routes/ratingRoutes');
+const historyRoutes = require('./routes/historyRoutes');
 
 // ==================== MOUNT ROUTES ====================
-// Xác thực & User
+// Xác thực & Tài khoản người dùng
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 
-// Các routes khác (mỗi người thêm vào đây)
+// Bình luận, Đánh giá & Lịch sử xem phim
+app.use('/api/comments', commentRoutes);
+app.use('/api/ratings', ratingRoutes);
+app.use('/api/history', historyRoutes);
+
+// Lưu ý: Thêm route mới vào đây khi cần
 // app.use('/api/movies', require('./routes/movieRoutes'));
-// app.use('/api/comments', require('./routes/commentRoutes'));
-// ...
 
 // ==================== SPA FALLBACK - PHỤC VỤ TRANG CHÍNH (OPTIONAL) ====================
 // Nếu bạn có index.html, uncomment dòng này:
@@ -107,9 +113,12 @@ app.use((req, res) => {
 });
 
 // ==================== ERROR HANDLING MIDDLEWARE ====================
+// Lưu ý: Express nhận biết đây là error middleware khi có đúng 4 tham số (err, req, res, next)
+// Tham số 'next' BẮT BUỘC phải có dù không dùng tới, nếu xóa Express sẽ không dùng middleware này xử lý lỗi
+// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
-  
+
   res.status(err.status || HTTP_STATUS.SERVER_ERROR).json({
     success: false,
     message: err.message || 'Lỗi server',

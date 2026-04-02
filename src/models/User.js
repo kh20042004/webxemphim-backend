@@ -1,13 +1,13 @@
 // ==================== USER MODEL ====================
 //
 // Mô tả: Schema MongoDB cho User (Người dùng)
-// Dùng để: Lưu thông tin tài khoản (email, password, fullName, avatar, role)
+// Dùng để: Lưu thông tin tài khoản (email, password, fullName, avatar, role, subscription)
 // Sử dụng: const User = require('../models/User');
 //
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const { USER_ROLES } = require('../config/constants');
+const { USER_ROLES, VIP_PLANS } = require('../config/constants');
 
 // ==================== ĐỊNH NGHĨA SCHEMA ====================
 const userSchema = new mongoose.Schema(
@@ -25,9 +25,22 @@ const userSchema = new mongoose.Schema(
       ],
     },
 
+    username: {
+      type: String,
+      unique: true,
+      trim: true,
+    },
+
     password: {
       type: String,
-      required: false, // Không bắt buộc cho Google OAuth users
+      // Bắt buộc khi đăng ký thường, KHÔNG bắt buộc với user Google OAuth (họ không có password)
+      // Dùng function để kiểm tra điều kiện: nếu googleId tồn tại thì không cần password
+      required: [
+        function () {
+          return !this.googleId; // Chỉ required khi không phải Google user
+        },
+        'Password là bắt buộc',
+      ],
       minlength: [6, 'Mật khẩu phải ít nhất 6 ký tự'],
       select: false, // Không trả về password khi query mà không chỉ định rõ
     },
@@ -87,6 +100,21 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+
+    // ============ VIP / Subscription ============
+    subscription: {
+      plan: {
+        type: String,
+        enum: Object.values(VIP_PLANS),
+        default: VIP_PLANS.FREE,
+      },
+      startDate: {
+        type: Date,
+      },
+      expiryDate: {
+        type: Date,
+      },
+    },
   },
   {
     // Tự động thêm createdAt và updatedAt
@@ -102,8 +130,14 @@ const userSchema = new mongoose.Schema(
  */
 userSchema.pre('save', async function (next) {
   // Chỉ hash password nếu password được thay đổi (isModified)
+  // QUAN TRỌNG: phải có 'return' để dừng lại, không thì code vẫn chạy xuống dưới
   if (!this.isModified('password')) {
-    next();
+    return next();
+  }
+
+  // Bỏ qua nếu user Google OAuth (không có password)
+  if (!this.password) {
+    return next();
   }
 
   try {
@@ -135,12 +169,35 @@ userSchema.methods.matchPassword = async function (inputPassword) {
 };
 
 /**
+ * Phương thức: So sánh password (alias comparePassword)
+ * @param {string} candidatePassword - Password cần so sánh
+ * @returns {Promise<boolean>}
+ */
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return await bcrypt.compare(candidatePassword, this.password);
+};
+
+/**
  * Phương thức: Kiểm tra user có phải admin không
  * Dùng cho: Authorization check
  * @returns {boolean} - True nếu là admin
  */
 userSchema.methods.isAdmin = function () {
   return this.role === USER_ROLES.ADMIN;
+};
+
+/**
+ * Phương thức: Kiểm tra VIP còn hạn không
+ * @returns {boolean} - True nếu VIP active
+ */
+userSchema.methods.isVIPActive = function () {
+  if (!this.subscription || this.subscription.plan === VIP_PLANS.FREE) {
+    return false;
+  }
+  if (!this.subscription.expiryDate) {
+    return false;
+  }
+  return new Date() < new Date(this.subscription.expiryDate);
 };
 
 /**
@@ -157,6 +214,7 @@ userSchema.methods.toJSON = function () {
 // ==================== INDEX ====================
 // Tạo index cho email để tìm kiếm nhanh hơn
 userSchema.index({ email: 1 });
+userSchema.index({ username: 1 });
 
 // ==================== STATIC METHODS ====================
 

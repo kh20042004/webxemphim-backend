@@ -1,6 +1,6 @@
 // ==================== USER ROUTES ====================
 //
-// Mô tả: Định nghĩa các API routes liên quan tới user profile
+// Mô tả: Định nghĩa các API routes liên quan tới user profile, password, VIP
 // Sử dụng: app.use('/api/user', require('./routes/userRoutes'));
 //
 
@@ -38,6 +38,15 @@ router.put('/profile', protect, userController.updateProfile);
  * Response: { success, message }
  */
 router.put('/password', protect, userController.updatePassword);
+
+/**
+ * POST /api/user/subscribe
+ * Mô tả: Đăng ký/Gia hạn gói VIP
+ * Headers: Authorization: Bearer <token>
+ * Body: { plan } - "premium" hoặc "vip"
+ * Response: { success, message, data: { plan, expiryDate } }
+ */
+router.post('/subscribe', protect, userController.subscribeVIP);
 
 // ==================== EXPORT ROUTER ====================
 module.exports = router;

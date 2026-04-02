@@ -1,12 +1,35 @@
 // ==================== USER CONTROLLER ====================
 //
-// Mô tả: Xử lý logic liên quan tới thông tin người dùng (profile, password, ...)
+// Mô tả: Xử lý logic liên quan tới thông tin người dùng (profile, password, VIP, ...)
 // Sử dụng: const userController = require('../controllers/userController');
 //
 
 const User = require('../models/User');
-const { HTTP_STATUS, PATTERNS } = require('../config/constants');
+const { HTTP_STATUS, PATTERNS, VIP_PLANS } = require('../config/constants');
 const { sendSuccess, sendError } = require('../utils/responseHandler');
+
+// ==================== API: LẤY PROFILE ====================
+
+/**
+ * GET /api/user/profile
+ * Mô tả: Lấy thông tin profile của user hiện tại
+ * Headers: Authorization: Bearer <token>
+ * Response: { success, user }
+ * Middleware: protect (yêu cầu đăng nhập)
+ */
+exports.getProfile = async (req, res, next) => {
+  try {
+    const user = req.user;
+
+    return sendSuccess(
+      res,
+      user.toJSON(),
+      'Lấy profile thành công'
+    );
+  } catch (error) {
+    next(error);
+  }
+};
 
 // ==================== API: CẬP NHẬT PROFILE ====================
 
@@ -24,10 +47,8 @@ exports.updateProfile = async (req, res, next) => {
     const userId = req.user._id;
 
     // ============ VALIDATE DỮ LIỆU ====================
-    // Chuẩn bị object tối cập nhật
     const updateData = {};
 
-    // Nếu fullName được cung cấp, thêm vào updateData
     if (fullName) {
       if (typeof fullName !== 'string' || fullName.trim().length === 0) {
         return sendError(
@@ -39,7 +60,6 @@ exports.updateProfile = async (req, res, next) => {
       updateData.fullName = fullName.trim();
     }
 
-    // Nếu avatar được cung cấp, thêm vào updateData
     if (avatar) {
       if (typeof avatar !== 'string' || avatar.trim().length === 0) {
         return sendError(
@@ -51,7 +71,6 @@ exports.updateProfile = async (req, res, next) => {
       updateData.avatar = avatar.trim();
     }
 
-    // Kiểm tra có dữ liệu để cập nhật không
     if (Object.keys(updateData).length === 0) {
       return sendError(
         res,
@@ -61,14 +80,12 @@ exports.updateProfile = async (req, res, next) => {
     }
 
     // ============ CẬP NHẬT USER ====================
-    // {new: true} để trả về user sau khi update
     const user = await User.findByIdAndUpdate(
       userId,
       updateData,
-      { new: true, runValidators: true } // runValidators để chạy validation schema
+      { new: true, runValidators: true }
     );
 
-    // ============ TRẢ VỀ RESPONSE ====================
     return sendSuccess(
       res,
       user.toJSON(),
@@ -103,7 +120,6 @@ exports.updatePassword = async (req, res, next) => {
       );
     }
 
-    // Kiểm tra newPassword và passwordConfirm khớp
     if (newPassword !== passwordConfirm) {
       return sendError(
         res,
@@ -112,7 +128,6 @@ exports.updatePassword = async (req, res, next) => {
       );
     }
 
-    // Kiểm tra newPassword có ít nhất 6 ký tự
     if (newPassword.length < 6) {
       return sendError(
         res,
@@ -121,7 +136,6 @@ exports.updatePassword = async (req, res, next) => {
       );
     }
 
-    // Kiểm tra oldPassword không được bằng newPassword
     if (oldPassword === newPassword) {
       return sendError(
         res,
@@ -131,7 +145,6 @@ exports.updatePassword = async (req, res, next) => {
     }
 
     // ============ LẤY USER CÙNG VỚI PASSWORD ====================
-    // .select('+password') vì password có select: false ở Model
     const user = await User.findById(userId).select('+password');
 
     if (!user) {
@@ -143,7 +156,6 @@ exports.updatePassword = async (req, res, next) => {
     }
 
     // ============ KIỂM TRA OLD PASSWORD ====================
-    // Dùng method matchPassword từ User model
     const isOldPasswordCorrect = await user.matchPassword(oldPassword);
 
     if (!isOldPasswordCorrect) {
@@ -156,10 +168,8 @@ exports.updatePassword = async (req, res, next) => {
 
     // ============ CẬP NHẬT MẬT KHẨU MỚI ====================
     user.password = newPassword;
-    // .save() sẽ trigger middleware pre('save') để hash password
     await user.save();
 
-    // ============ TRẢ VỀ RESPONSE ====================
     return sendSuccess(
       res,
       null,
@@ -170,23 +180,74 @@ exports.updatePassword = async (req, res, next) => {
   }
 };
 
-// ==================== API: LẤY PROFILE ====================
+// ==================== API: ĐĂNG KÝ VIP ====================
 
 /**
- * GET /api/user/profile
- * Mô tả: Lấy thông tin profile của user hiện tại
+ * POST /api/user/subscribe
+ * Mô tả: Đăng ký/Gia hạn gói VIP
  * Headers: Authorization: Bearer <token>
- * Response: { success, user }
+ * Body: { plan } (premium, vip)
+ * Response: { success, message, data: { plan, expiryDate } }
+ * Logic: Cộng dồn 30 ngày từ ngày hết hạn cũ hoặc hôm nay
  * Middleware: protect (yêu cầu đăng nhập)
  */
-exports.getProfile = async (req, res, next) => {
+exports.subscribeVIP = async (req, res, next) => {
   try {
-    const user = req.user;
+    const { plan } = req.body;
+    const userId = req.user._id;
+
+    // ============ VALIDATE PLAN ====================
+    if (!plan || !Object.values(VIP_PLANS).includes(plan) || plan === VIP_PLANS.FREE) {
+      return sendError(
+        res,
+        HTTP_STATUS.BAD_REQUEST,
+        'Loại gói không hợp lệ (phải là premium hoặc vip)'
+      );
+    }
+
+    // ============ LẤY USER ====================
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return sendError(
+        res,
+        HTTP_STATUS.NOT_FOUND,
+        'User không tồn tại'
+      );
+    }
+
+    // ============ TÍnh toán ngày hết hạn ====================
+    const DAYS_TO_ADD = 30; // 1 tháng mặc định
+    let startDate = new Date();
+
+    // Nếu đang là VIP và còn hạn, cộng dồn từ ngày hết hạn cũ
+    if (
+      user.subscription &&
+      user.subscription.plan !== VIP_PLANS.FREE &&
+      new Date(user.subscription.expiryDate) > new Date()
+    ) {
+      startDate = new Date(user.subscription.expiryDate);
+    }
+
+    const expiryDate = new Date(startDate);
+    expiryDate.setDate(expiryDate.getDate() + DAYS_TO_ADD);
+
+    // ============ CẬP NHẬT SUBSCRIPTION ====================
+    user.subscription = {
+      plan,
+      startDate: new Date(),
+      expiryDate,
+    };
+
+    await user.save();
 
     return sendSuccess(
       res,
-      user.toJSON(),
-      'Lấy profile thành công'
+      {
+        plan: user.subscription.plan,
+        expiryDate: user.subscription.expiryDate,
+      },
+      `Đăng ký gói ${plan} thành công!`
     );
   } catch (error) {
     next(error);
