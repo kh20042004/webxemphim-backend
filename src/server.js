@@ -53,15 +53,21 @@ app.get('/api/health', (req, res) => {
 // Import các route files
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const sportsRoutes = require('./routes/sportsRoutes');
 
 // ==================== MOUNT ROUTES ====================
 // Xác thực & User
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 
+// Sports module
+app.use('/api/sports', sportsRoutes);
+
 // Các routes khác (mỗi người thêm vào đây)
 // app.use('/api/movies', require('./routes/movieRoutes'));
 // app.use('/api/comments', require('./routes/commentRoutes'));
+// app.use('/api/episodes', require('./routes/episodeRoutes'));
+// app.use('/api/ratings', require('./routes/ratingRoutes'));
 // ...
 
 // ==================== 404 NOT FOUND ====================
