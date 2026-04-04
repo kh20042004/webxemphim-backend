@@ -86,6 +86,7 @@ const historyRoutes = require('./routes/historyRoutes');
 const favoritesRoutes = require('./routes/favoritesRoutes'); // Phim yêu thích
 const sportsRoutes = require('./routes/sportsRoutes'); // Thể thao
 
+
 // ==================== MOUNT ROUTES ====================
 // Xác thực & Tài khoản người dùng
 app.use('/api/auth', authRoutes);
@@ -116,6 +117,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 // Admin quản lý phim (TUẤN ANH - chỉ role admin)
 // POST/PUT/DELETE /api/admin/movies → thêm/sửa/xóa phim
 app.use('/api/admin/movies', require('./routes/admin/movieAdminRoutes'));
+app.use('/api/admin/users', require('./routes/admin/userAdminRoutes'));
 
 // ------------------------------------------------------------------
 // GET /api/categories
