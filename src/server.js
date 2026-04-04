@@ -84,6 +84,7 @@ const commentRoutes = require('./routes/commentRoutes');
 const ratingRoutes = require('./routes/ratingRoutes');
 const historyRoutes = require('./routes/historyRoutes');
 const favoritesRoutes = require('./routes/favoritesRoutes'); // Phim yêu thích
+const sportsRoutes = require('./routes/sportsRoutes'); // Thể thao
 
 // ==================== MOUNT ROUTES ====================
 // Xác thực & Tài khoản người dùng
@@ -97,6 +98,9 @@ app.use('/api/history', historyRoutes);
 
 // Phim yêu thích - thêm/xóa/xem danh sách phim yêu thích
 app.use('/api/favorites', favoritesRoutes);
+
+// Thể thao - API cho trang sports
+app.use('/api/sports', sportsRoutes);
 
 // Movie routes (Tuấn Anh + Nghĩa + Thu Hà)
 // /api/movies          → Danh sách phim (filter, pagination)
