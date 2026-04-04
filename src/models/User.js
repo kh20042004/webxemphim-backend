@@ -78,9 +78,10 @@ const userSchema = new mongoose.Schema(
     // ============ Google OAuth ============
     googleId: {
       type: String,
-      default: null,
+      // ✅ Bỏ default: null để tránh duplicate key error
+      // Khi user đăng ký bình thường (không Google OAuth), googleId sẽ undefined (không được lưu)
       unique: true,
-      sparse: true, // Cho phép null values mà không bị duplicate
+      sparse: true, // Cho phép null/undefined values mà không bị duplicate
     },
 
     isEmailVerified: {
