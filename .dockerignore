@@ -1,0 +1,49 @@
+# ==============================================================================
+# .DOCKERIGNORE CHO BACKEND
+# ==============================================================================
+# File này liệt kê những file/folder KHÔNG copy vào Docker image
+# Giúp giảm kích thước image và tăng tốc độ build
+
+# Folder node_modules (sẽ được install lại trong Docker)
+node_modules
+
+# File môi trường (chứa thông tin nhạy cảm - KHÔNG được đưa vào image)
+.env
+.env.local
+.env.*.local
+
+# Git folder
+.git
+.gitignore
+
+# Folder upload tạm (không cần thiết trong production)
+temp-uploads
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE/Editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+docs
+
+# Test files
+test
+*.test.js
+*.spec.js
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml

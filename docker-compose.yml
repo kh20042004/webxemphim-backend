@@ -1,0 +1,54 @@
+# ==============================================================================
+# DOCKER COMPOSE CHO BACKEND (RIÊNG BIỆT)
+# ==============================================================================
+# File này chỉ chạy backend, không bao gồm frontend
+
+version: '3.8'
+
+services:
+  # ============================================
+  # BACKEND - Node.js/Express API
+  # ============================================
+  backend:
+    # Tên container
+    container_name: webxemphim-backend
+    
+    # Build từ Dockerfile trong thư mục hiện tại
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    # Ánh xạ port: host:container
+    # Truy cập backend qua http://localhost:5000
+    ports:
+      - "5000:5000"
+    
+    # Biến môi trường - ĐỌC TỪ FILE .env (AN TOÀN HƠN)
+    # Không hard-code thông tin nhạy cảm vào file này!
+    env_file:
+      - .env  # Đọc tất cả biến môi trường từ file .env
+    
+    # Hoặc có thể override một số biến cụ thể:
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - FRONTEND_URL=http://localhost:8000
+    
+    # Volume - ánh xạ thư mục upload giữa host và container
+    # Khi container bị xóa, file upload vẫn còn trên host
+    volumes:
+      - ./temp-uploads:/app/temp-uploads
+    
+    # Restart policy - tự động khởi động lại khi crash
+    restart: unless-stopped
+    
+    # Networks - kết nối với các service khác
+    networks:
+      - webxemphim-network
+
+# ============================================
+# NETWORKS - Mạng nội bộ cho các container giao tiếp
+# ============================================
+networks:
+  webxemphim-network:
+    driver: bridge

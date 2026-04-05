@@ -208,7 +208,7 @@ exports.getTrending = async (req, res, next) => {
         const movies = await Movie.find()
             .sort({ views: -1 })
             .limit(limit)
-            .select('title poster thumbnail description category type year views episodes createdAt');
+            .select('title poster description category type year views episodes createdAt');
 
         // Trả về response theo chuẩn của dự án
         return res.status(HTTP_STATUS.OK).json({
@@ -258,7 +258,7 @@ exports.getNewMovies = async (req, res, next) => {
         const movies = await Movie.find()
             .sort({ createdAt: -1 })
             .limit(limit)
-            .select('title poster thumbnail description category type year views episodes createdAt');
+            .select('title poster description category type year views episodes createdAt');
 
         // Trả về response chuẩn
         return res.status(HTTP_STATUS.OK).json({
