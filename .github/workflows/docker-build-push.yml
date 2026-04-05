@@ -32,7 +32,7 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'  # Cache npm packages để chạy nhanh hơn
+        # cache: 'npm'  # Skip cache vì package-lock.json chưa được commit
         
     # Bước 3: Cài đặt các packages cần thiết (npm ci = clean install)
     - name: 📦 Install dependencies
