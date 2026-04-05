@@ -9,6 +9,8 @@ router.use(protect);
 
 router.get('/', historyController.getHistory);
 router.post('/', historyController.updateHistory);
+// Route cụ thể phải đặt TRƯỚC route động
+router.delete('/clear', historyController.clearHistory);
 router.delete('/:movieId', historyController.deleteHistory);
 
 module.exports = router;

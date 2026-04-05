@@ -14,7 +14,7 @@ const getHistory = async (req, res) => {
     const userId = req.user._id;
 
     const history = await History.find({ userId })
-      .populate('movieId', 'title poster description') // Load thông tin phim để hiển thị card
+      .populate('movieId', 'title poster description') // Xóa slug vì Movie model không có field này
       .sort({ updatedAt: -1 }); // Mới xem xong đưa lên đầu
 
     res.status(HTTP_STATUS.OK).json({ success: true, count: history.length, data: history });
@@ -51,7 +51,7 @@ const updateHistory = async (req, res) => {
 };
 
 /**
- * Xóa lịch sử (nếu cần)
+ * Xóa 1 lịch sử phim cụ thể
  */
 const deleteHistory = async (req, res) => {
   try {
@@ -67,8 +67,28 @@ const deleteHistory = async (req, res) => {
   }
 };
 
+/**
+ * Xóa toàn bộ lịch sử xem của user
+ * DELETE /api/history/clear
+ */
+const clearHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const result = await History.deleteMany({ userId });
+
+    res.status(HTTP_STATUS.OK).json({ 
+      success: true, 
+      message: `Đã xóa ${result.deletedCount} lịch sử xem thành công` 
+    });
+  } catch (error) {
+    res.status(HTTP_STATUS.SERVER_ERROR).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getHistory,
   updateHistory,
   deleteHistory,
+  clearHistory,
 };
